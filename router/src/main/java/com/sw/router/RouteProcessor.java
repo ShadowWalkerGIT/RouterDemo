@@ -7,6 +7,8 @@ import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeSpec;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -22,12 +24,12 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.Elements;
-import javax.lang.model.util.Types;
+import javax.xml.stream.XMLOutputFactory;
+import javax.xml.stream.XMLStreamWriter;
 
 public class RouteProcessor extends AbstractProcessor {
     private Filer mFiler;
     private Elements mElementUtils;
-    private Types mTypeUtils;
     private Map<String, Map<String, RouteMeta>> mGroupMap = new HashMap<>();
 
     @Override
@@ -35,7 +37,6 @@ public class RouteProcessor extends AbstractProcessor {
         super.init(processingEnvironment);
         mFiler = processingEnvironment.getFiler();
         mElementUtils = processingEnvironment.getElementUtils();
-        mTypeUtils = processingEnvironment.getTypeUtils();
     }
 
     @Override
@@ -65,21 +66,78 @@ public class RouteProcessor extends AbstractProcessor {
             }
         }
         generateJavaFile();
+        generateXml();
     }
 
+    private void generateXml() {
+        FileOutputStream fos = null;
+        XMLStreamWriter writer = null;
+        try {
+            File file = new File("router.xml");
+            if (!file.exists()) {
+                file.createNewFile();
+            } else {
+                file.delete();
+                file.createNewFile();
+            }
+            fos = new FileOutputStream(file);
+            writer = XMLOutputFactory.newInstance().createXMLStreamWriter(fos);
+            writer.writeStartDocument("UTF-8", "1.0");
+            writer.writeEndDocument();
+            writer.writeStartElement("routes");
+            for (String group : mGroupMap.keySet()) {
+                Map<String, RouteMeta> dataGroup = mGroupMap.get(group);
+                writer.writeStartElement("group");
+                writer.writeAttribute("name", group);
+                for (String path : dataGroup.keySet()) {
+                    RouteMeta temp = dataGroup.get(path);
+                    writer.writeStartElement("route");
+                    writer.writeAttribute("group", group);
+                    writer.writeAttribute("path", temp.getPath());
+                    writer.writeAttribute("class", temp.getDestinationQualifiedName());
+                    writer.writeEndElement();
+                }
+                writer.writeEndElement();
+            }
+            writer.writeEndElement();
+            writer.flush();
+            writer.close();
+            fos.close();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (writer != null) {
+                try {
+                    writer.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+            if (fos != null) {
+                try {
+                    fos.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
     private void generateJavaFile() {
         // constructor
         MethodSpec.Builder cb = MethodSpec.constructorBuilder()
                 .addModifiers(Modifier.PUBLIC)
                 .addStatement("mGroupMap = new $T<>()", HashMap.class);
+        int i = 0;
         for (String group : mGroupMap.keySet()) {
-            cb.addStatement("HashMap<String , RouteMeta> data = new HashMap<>()");
+            cb.addStatement("HashMap<String , RouteMeta> group$N = new HashMap<>()",String.valueOf(i));
             Map<String, RouteMeta> dataGroup = mGroupMap.get(group);
             for (String path : dataGroup.keySet()) {
                 RouteMeta temp = dataGroup.get(path);
-                cb.addStatement("data.put(\"$N\",new RouteMeta(\"$N\",\"$N\",\"$N\"))", path, temp.getGroup(), temp.getPath(), temp.getDestinationQualifiedName());
+                cb.addStatement("group$N.put(\"$N\",new RouteMeta(\"$N\",\"$N\",\"$N\"))",String.valueOf(i), path, temp.getGroup(), temp.getPath(), temp.getDestinationQualifiedName());
             }
-            cb.addStatement("mGroupMap.put(\"$N\" , data)", group);
+            cb.addStatement("mGroupMap.put(\"$N\" , group$N)", group,String.valueOf(i));
+            i++;
         }
         MethodSpec constructorMethodSpec = cb.build();
 
@@ -89,7 +147,9 @@ public class RouteProcessor extends AbstractProcessor {
                 .addParameter(String.class, "path")
                 .returns(Class.class)
                 .beginControlFlow("if (isStringEmpty(path) || !path.startsWith(\"/\"))")
-                .addStatement("throw new RuntimeException(\"path cannot be null\")")
+                .addStatement("String msg = \"path cannot be null\"")
+                .addStatement("print(msg)")
+                .addStatement("throw new RuntimeException(msg)")
                 .endControlFlow()
                 .addStatement("String group = getDefaultGroup(path)")
                 .addStatement("return getClassByRoute(group , path.substring(1 + group.length()))")
@@ -102,18 +162,26 @@ public class RouteProcessor extends AbstractProcessor {
                 .addParameter(String.class, "group")
                 .addParameter(String.class, "path")
                 .beginControlFlow("if (isStringEmpty(group) || isStringEmpty(path))")
-                .addStatement("throw new RuntimeException(\"group and path cannot be null\")")
+                .addStatement("String msg = \"group and path cannot be null\"")
+                .addStatement("print(msg)")
+                .addStatement("throw new RuntimeException(msg)")
                 .endControlFlow()
                 .beginControlFlow("if (mGroupMap.isEmpty())")
-                .addStatement("throw new RuntimeException(\"route map is empty\")")
+                .addStatement("String msg = \"route map is empty\"")
+                .addStatement("print(msg)")
+                .addStatement("throw new RuntimeException(msg)")
                 .endControlFlow()
                 .addStatement("HashMap<String , RouteMeta> routeMetas = mGroupMap.get(group)")
                 .beginControlFlow("if (routeMetas == null || routeMetas.isEmpty())")
-                .addStatement("throw new RuntimeException(\"cannot find group for key : \" + group)")
+                .addStatement("String msg = \"cannot find group for key : \" + group")
+                .addStatement("print(msg)")
+                .addStatement("throw new RuntimeException(msg)")
                 .endControlFlow()
                 .addStatement("RouteMeta routeMeta = routeMetas.get(path)")
                 .beginControlFlow("if (routeMeta == null)")
-                .addStatement("throw new RuntimeException( \"cannot find path for group : \" + path)")
+                .addStatement("String msg = \"cannot find path for key : \" + path")
+                .addStatement("print(msg)")
+                .addStatement("throw new RuntimeException(msg)")
                 .endControlFlow()
                 .addStatement("Class destinationClass = routeMeta.getDestinationClass()")
                 .beginControlFlow("if (destinationClass != null)")
@@ -138,13 +206,24 @@ public class RouteProcessor extends AbstractProcessor {
                 .addStatement("return text == null || text.length() == 0")
                 .build();
 
+        MethodSpec print = MethodSpec.methodBuilder("print")
+                .addModifiers(Modifier.PRIVATE)
+                .returns(void.class)
+                .addParameter(String.class,"msg")
+                .addStatement("System.out.println(\"*********error start*******\")")
+                .addStatement("System.out.println(msg)")
+                .addStatement("System.out.println(\"*********error end*******\")")
+                .build();
+
         // getDefaultGroup
         MethodSpec getDefaultGroup = MethodSpec.methodBuilder("getDefaultGroup")
                 .addModifiers(Modifier.PRIVATE)
                 .addParameter(String.class, "path")
                 .returns(String.class)
                 .beginControlFlow("if (isStringEmpty(path) || !path.startsWith(\"/\"))")
-                .addStatement("throw new RuntimeException(\"path cannot be null\")")
+                .addStatement("String msg = \"path cannot be null\"")
+                .addStatement("print(msg)")
+                .addStatement("throw new RuntimeException(msg)")
                 .endControlFlow()
                 .addStatement("return path.substring( 1, path.indexOf(\"/\" , 1))")
                 .build();
@@ -166,6 +245,7 @@ public class RouteProcessor extends AbstractProcessor {
                 .addMethod(getClassByPath)
                 .addMethod(getDefaultGroup)
                 .addMethod(isStringEmpty)
+                .addMethod(print)
                 .addField(FieldSpec.builder(parameterizedTypeName, "mGroupMap").addModifiers(Modifier.PRIVATE).build())
                 .build();
         JavaFile javaFile = JavaFile.builder("com.sw.router", classTypeSpec).build();

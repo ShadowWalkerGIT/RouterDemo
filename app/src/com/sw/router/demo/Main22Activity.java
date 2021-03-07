@@ -8,8 +8,8 @@ import com.sw.router.Route;
 import com.sw.router.RouterHelper;
 import com.sw.router.routerdemo.R;
 
-@Route(group = "app",path = "/MainAc")
-public class MainActivity extends Activity {
+@Route(group = "123",path = "/Main22Ac")
+public class Main22Activity extends Activity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
