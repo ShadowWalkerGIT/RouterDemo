@@ -1,0 +1,9 @@
+apply plugin: 'java-library'
+
+dependencies {
+    implementation 'com.squareup:javapoet:1.11.1'
+    implementation project(':router:router_api')
+}
+
+sourceCompatibility = "8"
+targetCompatibility = "8"

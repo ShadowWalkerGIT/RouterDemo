@@ -1,2 +1,4 @@
-include ':app', ':router'
-rootProject.name='RouterDemo'
+include ':app'
+include ':router:router_navigator'
+include ':router:router_api'
+include ':router:router_compiler'

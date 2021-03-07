@@ -2,8 +2,7 @@ package com.sw.router;
 
 import java.lang.reflect.Method;
 
-public class RouterHelper {
-    private static volatile RouterHelper sInstance;
+public class RouteHelper {
     private static final String ROUTER_CLASS_NAME = "com.sw.router.Router";
     private static final String METHOD_NAME = "getClassByRoute";
     private static Method sGetClassByPathMethod;
@@ -11,18 +10,7 @@ public class RouterHelper {
     private static Class sRouterClass;
     private static Object sRouter;
 
-    private RouterHelper() {
-    }
-
-    public static RouterHelper getInstance() {
-        if (sInstance == null) {
-            synchronized (RouterHelper.class) {
-                if (sInstance == null) {
-                    sInstance = new RouterHelper();
-                }
-            }
-        }
-        return sInstance;
+    private RouteHelper() {
     }
 
     public static Class getRealClass(String path) throws Exception {

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<routes>
+    <group name="app">
+        <route group="app" path="/MainAc" class="com.sw.router.demo.MainActivity"></route>
+    </group>
+    <group name="123">
+        <route group="123" path="/Main22Ac" class="com.sw.router.demo.Main22Activity"></route>
+        <route group="123" path="/Main2Ac" class="com.sw.router.demo.Main2Activity"></route>
+    </group>
+</routes>

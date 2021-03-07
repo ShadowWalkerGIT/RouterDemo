@@ -1,4 +1,4 @@
-package com.sw.router;
+package com.sw.fm.router.compiler;
 
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.FieldSpec;
@@ -6,6 +6,8 @@ import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeSpec;
+import com.sw.router.Route;
+import com.sw.router.RouteMeta;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -84,12 +86,15 @@ public class RouteProcessor extends AbstractProcessor {
             writer = XMLOutputFactory.newInstance().createXMLStreamWriter(fos);
             writer.writeStartDocument("UTF-8", "1.0");
             writer.writeEndDocument();
+            writer.writeCharacters("\n");
             writer.writeStartElement("routes");
             for (String group : mGroupMap.keySet()) {
+                writer.writeCharacters("\n    ");
                 Map<String, RouteMeta> dataGroup = mGroupMap.get(group);
                 writer.writeStartElement("group");
                 writer.writeAttribute("name", group);
                 for (String path : dataGroup.keySet()) {
+                    writer.writeCharacters("\n        ");
                     RouteMeta temp = dataGroup.get(path);
                     writer.writeStartElement("route");
                     writer.writeAttribute("group", group);
@@ -97,8 +102,10 @@ public class RouteProcessor extends AbstractProcessor {
                     writer.writeAttribute("class", temp.getDestinationQualifiedName());
                     writer.writeEndElement();
                 }
+                writer.writeCharacters("\n    ");
                 writer.writeEndElement();
             }
+            writer.writeCharacters("\n");
             writer.writeEndElement();
             writer.flush();
             writer.close();
@@ -129,14 +136,16 @@ public class RouteProcessor extends AbstractProcessor {
                 .addModifiers(Modifier.PUBLIC)
                 .addStatement("mGroupMap = new $T<>()", HashMap.class);
         int i = 0;
+        cb.addComment("Key:path ; Value: RouteMeta");
         for (String group : mGroupMap.keySet()) {
-            cb.addStatement("HashMap<String , RouteMeta> group$N = new HashMap<>()",String.valueOf(i));
+            cb.addStatement("HashMap<String, RouteMeta> group$N = new HashMap<>()",String.valueOf(i));
             Map<String, RouteMeta> dataGroup = mGroupMap.get(group);
             for (String path : dataGroup.keySet()) {
                 RouteMeta temp = dataGroup.get(path);
-                cb.addStatement("group$N.put(\"$N\",new RouteMeta(\"$N\",\"$N\",\"$N\"))",String.valueOf(i), path, temp.getGroup(), temp.getPath(), temp.getDestinationQualifiedName());
+                cb.addStatement("group$N.put(\"$N\", new RouteMeta(\"$N\",\"$N\",\"$N\"))",String.valueOf(i), path, temp.getGroup(), temp.getPath(), temp.getDestinationQualifiedName());
             }
-            cb.addStatement("mGroupMap.put(\"$N\" , group$N)", group,String.valueOf(i));
+            cb.addStatement("mGroupMap.put(\"$N\", group$N)", group,String.valueOf(i));
+            cb.addCode("\n");
             i++;
         }
         MethodSpec constructorMethodSpec = cb.build();
@@ -225,7 +234,7 @@ public class RouteProcessor extends AbstractProcessor {
                 .addStatement("print(msg)")
                 .addStatement("throw new RuntimeException(msg)")
                 .endControlFlow()
-                .addStatement("return path.substring( 1, path.indexOf(\"/\" , 1))")
+                .addStatement("return path.substring(1, path.indexOf(\"/\" , 1))")
                 .build();
 
         // mGroupMap HashMap<String,HashMap<String,RouteMeta> mGroupMap
@@ -264,6 +273,16 @@ public class RouteProcessor extends AbstractProcessor {
             routeMetas.put(routeMeta.getPath(), routeMeta);
             mGroupMap.put(routeMeta.getGroup(), routeMetas);
         } else {
+            if (routeMetas.containsKey(routeMeta.getPath())) {
+                String msg = new StringBuilder().append("\n")
+                        .append("***************************************************************\n*\n")
+                        .append("* path : " + (routeMeta.getGroup()+routeMeta.getPath()) + " has already been declared before. \n")
+                        .append("* last declare : ").append(routeMetas.get(routeMeta.getPath()).getDestinationQualifiedName()).append("\n")
+                        .append("* current declare : ").append(routeMeta.getDestinationQualifiedName()).append("\n*\n")
+                        .append("***************************************************************\n")
+                        .toString();
+                throw new IllegalArgumentException(msg);
+            }
             routeMetas.put(routeMeta.getPath(), routeMeta);
         }
     }
