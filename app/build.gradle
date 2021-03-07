@@ -17,5 +17,5 @@ android {
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation project(':router:router_navigator')
-    annotationProcessor project(':router:router_compiler')
+    annotationProcessor project(':router:router_compiler')//需要在用到注解@Route的地方添加此依赖
 }
