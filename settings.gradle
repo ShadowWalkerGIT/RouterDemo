@@ -1,0 +1,2 @@
+include ':app', ':router'
+rootProject.name='RouterDemo'
