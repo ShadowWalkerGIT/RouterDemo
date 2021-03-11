@@ -16,7 +16,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        findViewById(R.id.btn_main).setOnClickListener(v -> Navigator.startActivityForResult(this, "123", "/Main22Ac", 100));
+        findViewById(R.id.btn_main).setOnClickListener(v -> Navigator.startActivityForResult(this, "liba", "/Liba", 100));
     }
 
 

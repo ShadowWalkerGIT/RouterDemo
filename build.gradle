@@ -32,6 +32,13 @@ subprojects {
                 defaultConfig {
                     minSdkVersion 18
                     targetSdkVersion 28
+
+                    javaCompileOptions{
+                        annotationProcessorOptions{
+                            arguments = [SW_ROUTER_MODULE_NAME: project.getName()]
+                        }
+                    }
+
                 }
 
                 compileOptions {

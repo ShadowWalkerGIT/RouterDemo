@@ -1,4 +1,4 @@
-package com.sw.fm.router.compiler;
+package com.sw.router.compiler;
 
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.FieldSpec;
@@ -6,12 +6,16 @@ import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeSpec;
+import com.squareup.javapoet.WildcardTypeName;
+import com.sw.router.IRouteGroup;
+import com.sw.router.IRouteRoot;
 import com.sw.router.Route;
 import com.sw.router.RouteMeta;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
@@ -30,8 +34,10 @@ import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamWriter;
 
 public class RouteProcessor extends AbstractProcessor {
+    private static final String METHOD_LOAD_INTO = "loadInto";
     private Filer mFiler;
     private Elements mElementUtils;
+    private String mModuleName;
     private Map<String, Map<String, RouteMeta>> mGroupMap = new HashMap<>();
 
     @Override
@@ -39,6 +45,17 @@ public class RouteProcessor extends AbstractProcessor {
         super.init(processingEnvironment);
         mFiler = processingEnvironment.getFiler();
         mElementUtils = processingEnvironment.getElementUtils();
+        parseModuleName(processingEnvironment);
+    }
+
+    private void parseModuleName(ProcessingEnvironment processingEnvironment) {
+        Map<String, String> options = processingEnvironment.getOptions();
+        if (options != null && !options.isEmpty()) {
+            mModuleName = options.get(SwCompilerConst.KEY_MODULE_NAME);
+        }
+        if (isStringEmpty(mModuleName)) {
+            throw new RuntimeException(SwCompilerConst.NO_MODULE_NAME_TIPS);
+        }
     }
 
     @Override
@@ -140,6 +157,82 @@ public class RouteProcessor extends AbstractProcessor {
     }
 
     private void generateJavaFile() {
+        for (String groupName : mGroupMap.keySet()) {
+            generateGroupFile(groupName, mGroupMap.get(groupName));
+        }
+        generateRootFile();
+    }
+
+    private void generateRootFile() {
+        String rootJavaFileName = SwCompilerConst.JAVA_FILE_NAME_PREFIX_ROOT + mModuleName;
+        // param
+        ParameterizedTypeName parameterizedTypeName = ParameterizedTypeName.get(ClassName.get(Map.class),
+                ClassName.get(String.class),
+                ParameterizedTypeName.get(
+                        ClassName.get(Class.class),
+                        WildcardTypeName.subtypeOf(IRouteGroup.class)));
+        // method:override loadInto
+        String paramName = "groups";
+        MethodSpec.Builder loadIntoMethodBuilder = MethodSpec.methodBuilder(METHOD_LOAD_INTO)
+                .addAnnotation(Override.class)
+                .addModifiers(Modifier.PUBLIC)
+                .addParameter(parameterizedTypeName, paramName);
+        // method statement, add groups
+        for (String groupName : mGroupMap.keySet()) {
+            String groupJavaFileClass = SwCompilerConst.JAVA_FILE_NAME_PREFIX_GROUP + groupName + ".class";
+            loadIntoMethodBuilder.addStatement(paramName + ".put(\"$N\", $N)", groupName, groupJavaFileClass);
+        }
+
+        // class
+        TypeSpec classTypeSpec = TypeSpec.classBuilder(rootJavaFileName)
+                .addModifiers(Modifier.PUBLIC)
+                .addSuperinterface(ClassName.get(IRouteRoot.class))
+                .addMethod(loadIntoMethodBuilder.build())
+                .build();
+        try {
+            JavaFile rootFile = JavaFile.builder(SwCompilerConst.PACKAGE_NAME, classTypeSpec).build();
+            rootFile.writeTo(mFiler);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void generateGroupFile(String groupName, Map<String, RouteMeta> routeMap) {
+        String groupJavaFileName = SwCompilerConst.JAVA_FILE_NAME_PREFIX_GROUP + groupName;
+
+        // param
+        ParameterizedTypeName parameterizedTypeName = ParameterizedTypeName.get(ClassName.get(Map.class),
+                ClassName.get(String.class),
+                ClassName.get(RouteMeta.class));
+
+        // method:override loadInto
+        String paramName = "routes";
+        MethodSpec.Builder loadIntoMethodBuilder = MethodSpec.methodBuilder(METHOD_LOAD_INTO)
+                .addAnnotation(Override.class)
+                .addModifiers(Modifier.PUBLIC)
+                .addParameter(parameterizedTypeName, paramName);
+        // method statement, add routes
+        for (String path : routeMap.keySet()) {
+            RouteMeta routeMeta = routeMap.get(path);
+            loadIntoMethodBuilder.addStatement("$N.put(\"$N\", new RouteMeta(\"$N\",\"$N\",\"$N\"))", paramName, path, routeMeta.getGroup(), routeMeta.getPath(), routeMeta.getDestinationQualifiedName());
+        }
+
+        // class
+        TypeSpec classTypeSpec = TypeSpec.classBuilder(groupJavaFileName)
+                .addModifiers(Modifier.PUBLIC)
+                .addSuperinterface(ClassName.get(IRouteGroup.class))
+                .addMethod(loadIntoMethodBuilder.build())
+                .build();
+        try {
+            JavaFile javaFile = JavaFile.builder(SwCompilerConst.PACKAGE_NAME, classTypeSpec).build();
+            javaFile.writeTo(mFiler);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    private void generateFile() {
         // constructor
         MethodSpec constructorMethod = MethodSpec.constructorBuilder().addModifiers(Modifier.PRIVATE).build();
         MethodSpec.Builder cb = MethodSpec.methodBuilder("init")
@@ -271,7 +364,7 @@ public class RouteProcessor extends AbstractProcessor {
                 .addMethod(print)
                 .addField(FieldSpec.builder(parameterizedTypeName, "sGroupMap").addModifiers(Modifier.PRIVATE, Modifier.STATIC).initializer("init()").build())
                 .build();
-        JavaFile javaFile = JavaFile.builder("com.sw.router", classTypeSpec).build();
+        JavaFile javaFile = JavaFile.builder(SwCompilerConst.PACKAGE_NAME, classTypeSpec).build();
         try {
             javaFile.writeTo(mFiler);
         } catch (Exception e) {
@@ -336,5 +429,12 @@ public class RouteProcessor extends AbstractProcessor {
         LinkedHashSet<String> types = new LinkedHashSet<>();
         types.add(Route.class.getCanonicalName());
         return types;
+    }
+
+    @Override
+    public Set<String> getSupportedOptions() {
+        return new HashSet<String>() {{
+            this.add(SwCompilerConst.KEY_MODULE_NAME);
+        }};
     }
 }

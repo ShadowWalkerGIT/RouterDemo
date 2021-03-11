@@ -1,4 +1,4 @@
-package com.sw.router;
+package com.sw.fm.router.navigator;
 
 import java.lang.reflect.Method;
 

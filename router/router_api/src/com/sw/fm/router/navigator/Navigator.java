@@ -5,8 +5,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 
-import com.sw.router.RouteHelper;
-
 public final class Navigator {
     private Navigator() {
     }
@@ -21,7 +19,7 @@ public final class Navigator {
 
     public static void startActivityForResult(Context context, String qualifiedPath, int requestCode, Bundle extras) {
         try {
-            startActivityForResult(context, RouteHelper.getRealClass(qualifiedPath), requestCode, extras);
+            startActivityForResult(context, RouteHelperV2.getRealClass(qualifiedPath), requestCode, extras);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -37,7 +35,7 @@ public final class Navigator {
 
     public static void startActivityForResult(Context context, String group, String path, int requestCode, Bundle extras) {
         try {
-            startActivityForResult(context, RouteHelper.getRealClass(group, path), requestCode, extras);
+            startActivityForResult(context, RouteHelperV2.getRealClass(group, path), requestCode, extras);
         } catch (Exception e) {
             e.printStackTrace();
         }

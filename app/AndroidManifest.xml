@@ -3,6 +3,7 @@
     package="com.sw.router.routerdemo">
 
     <application
+        android:name="com.sw.router.demo.App"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
